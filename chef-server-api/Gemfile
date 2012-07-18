@@ -1,3 +1,6 @@
+$:.unshift(File.join(File.dirname(__FILE__), 'lib'))
+require "chef-server-api"
+
 source :rubygems
 
 gem 'bunny'
@@ -13,8 +16,8 @@ gem "merb-haml", merb_gems_version
 gem "merb-helpers", merb_gems_version
 gem "merb-param-protection", merb_gems_version
 
-gem 'chef', :path => '../chef'
-gem 'chef-solr', :path => '../chef-solr'
+gem "chef", ChefServerApi::VERSION, :require => false # load individual parts as needed
+gem "chef-solr", ChefServerApi::VERSION, :require => "chef/solr"
 
 group :test do
   gem "rake"
@@ -22,4 +25,8 @@ group :test do
   gem "rspec", "~> 2.5"
   gem "webrat"
   gem "webrat-rspec-rails"
+end
+
+group(:prod) do
+  gem "unicorn", "~> 2.0.0"
 end
