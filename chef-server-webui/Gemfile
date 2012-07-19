@@ -1,3 +1,6 @@
+$:.unshift(File.join(File.dirname(__FILE__), 'lib'))
+require "chef-server-webui"
+
 source :rubygems
 
 gem "haml"
@@ -10,6 +13,9 @@ gem "merb-assets", merb_gems_version
 gem "merb-haml", merb_gems_version
 gem "merb-helpers", merb_gems_version
 gem "merb-param-protection", merb_gems_version
+
+gem "chef", ChefServerWebui::VERSION, :require => false # load individual parts as needed
+gem "chef-solr", ChefServerWebui::VERSION, :require => false
 
 group(:dev) do
   gem "thin"
