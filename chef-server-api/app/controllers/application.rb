@@ -3,7 +3,8 @@
 # Author:: Christopher Brown (<cb@opscode.com>)
 # Author:: Christopher Walters (<cw@opscode.com>)
 # Author:: Tim Hinderliter (<tim@opscode.com>)
-# Copyright:: Copyright (c) 2008-2010 Opscode, Inc.
+# Author:: Claudio Cesar Sanchez Tejeda (<demonccc@gmail.com>)
+# Copyright:: Copyright (c) 2008-2012 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +36,6 @@ class Application < Merb::Controller
 
       username = authenticator.user_id
       Chef::Log.info("Authenticating client #{username}")
-
       user = Chef::ApiClient.cdb_load(username)
       user_key = OpenSSL::PKey::RSA.new(user.public_key)
       Chef::Log.debug "Authenticating Client:\n #{user.inspect}\n"
@@ -58,6 +58,66 @@ class Application < Merb::Controller
         raise Unauthorized, "Failed to authenticate. Please synchronize the clock on your client"
       end
     end
+     
+    # Check permissions of the client and permit him to apply changes
+ 
+    request_params  = self.class._filter_params(request.params)
+
+    id_param = case request_params["controller"]
+      when "cookbooks"
+        "cookbook_name"
+      when "sandboxes"
+        "sandbox_id"
+      else
+        "id"
+      end
+
+    if user.permissions.is_a?(Hash) and not @auth_user.admin
+      unless request_params["controller"].nil?
+        
+        permissions = {}
+        permissions.merge!(user.permissions["resources"]) unless user.permissions["resources"].nil?
+       
+        request_params["action"] = "all" if request_params["action"].nil?
+        request_params[id_param] = "all" if  request_params[id_param].nil?
+        unless permissions[request_params["controller"]].nil?
+          case permissions[request_params["controller"]]
+          when FalseClass
+            raise Forbidden, "You are not allowed to operate with #{request_params["controller"]}"
+          when TrueClass
+            @auth_user.admin(true)
+          when Hash
+            unless permissions[request_params["controller"]]["all"].nil?
+              unless permissions[request_params["controller"]]["all"][request_params[id_param]].nil?
+                if permissions[request_params["controller"]]["all"][request_params[id_param]].is_a?(FalseClass)
+                  raise Forbidden, "You are not allowed to take actions on #{request_params[id_param]}."
+                else
+                  @auth_user.admin(true)
+                end
+              end
+            end
+            unless permissions[request_params["controller"]][request_params["action"]].nil?
+              case permissions[request_params["controller"]][request_params["action"]]
+              when FalseClass
+                raise Forbidden, "You are not allowed to perform the action #{request_params["action"]} in the #{request_params["controller"]}."
+              when TrueClass
+                @auth_user.admin(true)
+              when Hash
+                unless permissions[request_params["controller"]][request_params["action"]][request_params[id_param]].nil?
+                  if permissions[request_params["controller"]][request_params["action"]][request_params[id_param]].is_a?(FalseClass)
+                    raise Forbidden, "You are not allowed to take the action #{request_params["action"]} on #{request_params[id_param]}."
+                  else
+                    @auth_user.admin(true)
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+    # Audit all changes
+    Merb.logger.info { "Audit log - User: #{username} Resource: #{request_params["controller"]} Action: #{request_params["action"]} Id: #{request_params[id_param]} admin: #{@auth_user.admin}" }      
     true
   end
 

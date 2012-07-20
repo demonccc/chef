@@ -1,7 +1,8 @@
 #
 # Author:: Adam Jacob (<adam@opscode.com>)
 # Author:: Nuo Yan (<nuo@opscode.com>)
-# Copyright:: Copyright (c) 2008 Opscode, Inc.
+# Author:: Claudio Cesar Sanchez Tejeda (<demonccc@gmail.com>)
+# Copyright:: Copyright (c) 2008-2012 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,9 +24,9 @@ class Clients < Application
   provides :json
 
   before :authenticate_every
-  before :is_admin, :only => [ :index, :update ]
+  before :is_admin, :only => [ :index, :update, :destroy ]
   before :is_admin_or_validator, :only => [ :create ]
-  before :admin_or_requesting_node, :only => [ :show, :destroy ]
+  before :admin_or_requesting_node, :only => [ :show ]
   
   # GET /clients
   def index
@@ -81,6 +82,7 @@ class Clients < Application
     if params.has_key?(:inflated_object)
       params[:private_key] ||= params[:inflated_object].private_key
       params[:admin] ||= params[:inflated_object].admin
+      params[:permissions] ||= params[:inflated_object].permissions
     end
 
     begin
@@ -90,8 +92,14 @@ class Clients < Application
     end
     
     @client.admin(params[:admin]) unless params[:admin].nil?
+    
+    if params[:permissions].is_a?(Hash)
+      @client.permissions(params[:permissions])
+    else
+      @client.permissions(false)
+    end
 
-    results = { :name => @client.name, :admin => @client.admin }
+    results = { :name => @client.name, :admin => @client.admin, :permissions => @client.permissions }
 
     if params[:private_key] == true
       @client.create_keys

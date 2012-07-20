@@ -1,7 +1,8 @@
 #
 # Author:: Adam Jacob (<adam@opscode.com>)
 # Author:: Nuo Yan (<nuo@opscode.com>)
-# Copyright:: Copyright (c) 2008 Opscode, Inc.
+# Author:: Claudio Cesar Sanchez Tejeda (<demonccc@gmail.com>)
+# Copyright:: Copyright (c) 2008-2012 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,6 +78,7 @@ class Chef
       @couchdb_id = nil
       @admin = false
       @couchdb = (couchdb || Chef::CouchDB.new)
+      @permissions = false
     end
 
     # Gets or sets the client name.
@@ -127,6 +129,18 @@ class Chef
       )
     end
 
+    # Gets or sets the permissions
+    #
+    # @params [Optional Hash] The hash with the permissions settings.
+    # @return [Hash] The current permissions settings.
+    def permissions(arg=nil)
+      set_or_return(
+        :permissions,
+        arg,
+        :kind_of => [ Hash, FalseClass ]
+      )
+    end
+
     # Creates a new public/private key pair, and populates the public_key and
     # private_key attributes.
     #
@@ -148,7 +162,8 @@ class Chef
         "public_key" => @public_key,
         "admin" => @admin,
         'json_class' => self.class.name,
-        "chef_type" => "client"
+        "chef_type" => "client",
+        "permissions" => @permissions
       }
       result["_rev"] = @couchdb_rev if @couchdb_rev
       result
@@ -166,6 +181,7 @@ class Chef
       client.name(o["name"] || o["clientname"])
       client.public_key(o["public_key"])
       client.admin(o["admin"])
+      client.permissions(o["permissions"])
       client.couchdb_rev = o["_rev"]
       client.couchdb_id = o["_id"]
       client.index_id = client.couchdb_id
@@ -244,7 +260,7 @@ class Chef
       rescue Net::HTTPServerException => e
         # If that fails, go ahead and try and update it
         if e.response.code == "409"
-          r.put_rest("clients/#{name}", { :name => self.name, :admin => self.admin, :private_key => new_key })
+          r.put_rest("clients/#{name}", { :name => self.name, :admin => self.admin, :private_key => new_key, :permissions => self.permissions })
         else
           raise e
         end
