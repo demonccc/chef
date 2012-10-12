@@ -3,8 +3,7 @@
 # Author:: Christopher Brown (<cb@opscode.com>)
 # Author:: Christopher Walters (<cw@opscode.com>)
 # Author:: Tim Hinderliter (<tim@opscode.com>)
-# Author:: Claudio Cesar Sanchez Tejeda (<demonccc@gmail.com>)
-# Copyright:: Copyright (c) 2008-2012 Opscode, Inc.
+# Copyright:: Copyright (c) 2008-2010 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +35,7 @@ class Application < Merb::Controller
 
       username = authenticator.user_id
       Chef::Log.info("Authenticating client #{username}")
+#      Merb.logger.info { "lalal Params: #{self.class._filter_params(request.params).inspect}" }      
       user = Chef::ApiClient.cdb_load(username)
       user_key = OpenSSL::PKey::RSA.new(user.public_key)
       Chef::Log.debug "Authenticating Client:\n #{user.inspect}\n"
@@ -58,22 +58,38 @@ class Application < Merb::Controller
         raise Unauthorized, "Failed to authenticate. Please synchronize the clock on your client"
       end
     end
-     
-    # Check permissions of the client and permit him to apply changes
- 
+      
     request_params  = self.class._filter_params(request.params)
 
-    id_param = case request_params["controller"]
-      when "cookbooks"
-        "cookbook_name"
-      when "sandboxes"
-        "sandbox_id"
-      else
-        "id"
-      end
-
     if user.permissions.is_a?(Hash) and not @auth_user.admin
+
       unless request_params["controller"].nil?
+
+        id_param = case request_params["controller"]
+          when "cookbooks"
+            "cookbook_name"
+          when "sandboxes"
+            "sandbox_id"
+          else
+            "id"
+          end
+
+        if request_params["inflated_object"] and request_params["action"].eql?("create")
+          request_params["id"] = request_params["inflated_object"].name
+        end
+
+        if request_params["controller"].eql?("data_item")
+          unless permissions["data_bags"].nil?
+            if permissions["data_bags"].is_a?(FalseClass)
+              raise Forbidden, "You are not allowed to operate with #{request_params["controller"]} in databag #{request_params["data_bag_id"]}"
+            end
+            [ "all", request_params["action"]].each do |data_bag_action|
+              if permissions["data_bags"][data_bag_action].is_a?(FalseClass) or (permissions["data_bags"][data_bag_action].is_a?(Hash) and permissions["data_bags"][data_bag_action][request_params["data_bag_id"]].is_a?(FalseClass))
+                raise Forbidden, "You are not allowed to operate with #{request_params["controller"]} in databag #{request_params["data_bag_id"]}"
+              end
+            end
+          end
+        end
         
         permissions = {}
         permissions.merge!(user.permissions["resources"]) unless user.permissions["resources"].nil?
@@ -116,7 +132,6 @@ class Application < Merb::Controller
         end
       end
     end
-    # Audit all changes
     Merb.logger.info { "Audit log - User: #{username} Resource: #{request_params["controller"]} Action: #{request_params["action"]} Id: #{request_params[id_param]} admin: #{@auth_user.admin}" }      
     true
   end
