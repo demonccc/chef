@@ -61,22 +61,22 @@ class Application < Merb::Controller
       
     request_params  = self.class._filter_params(request.params)
 
+    id_param = case request_params["controller"]
+      when "cookbooks"
+        "cookbook_name"
+      when "sandboxes"
+        "sandbox_id"
+      else
+        "id"
+      end
+
+    if request_params["inflated_object"] and request_params["action"].eql?("create")
+      request_params["id"] = request_params["inflated_object"].name
+    end
+
     if user.permissions.is_a?(Hash) and not @auth_user.admin
 
       unless request_params["controller"].nil?
-
-        id_param = case request_params["controller"]
-          when "cookbooks"
-            "cookbook_name"
-          when "sandboxes"
-            "sandbox_id"
-          else
-            "id"
-          end
-
-        if request_params["inflated_object"] and request_params["action"].eql?("create")
-          request_params["id"] = request_params["inflated_object"].name
-        end
 
         if request_params["controller"].eql?("data_item")
           unless permissions["data_bags"].nil?
@@ -209,4 +209,3 @@ class Application < Merb::Controller
   end
 
 end
-

@@ -1,0 +1,20 @@
+= DESCRIPTION:
+
+The fil
+
+= USAGE
+
+
+== Unit Tests (rspec):
+
+* Gecode (version 3.5.0)
+
+
+  rake install
+
+* Java
+* CouchDB (0.10+)
+* RabbitMQ (1.7.2+)
+
+  (sudo) rake dev:features
+
